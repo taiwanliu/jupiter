@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>jupiter</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="vendors/vuejs/vue.min.js"></script>
+    <script src="vendors/elementui/index.js"></script>
+    <script src="vendors/axios/axios.min.js"></script>
+    <link rel="stylesheet" href="vendors/elementui/theme-chalk/index.css">
+</head>
+
+<body>
+    <div id="app">
+        <div>
+            <el-button v-on:click="insertpage" type="text">Insert page</el-button>
+            <el-button v-on:click="viewpage" type="text">View page</el-button>
+        </div>
+
+        <el-form v-show="init" label-width="80px">
+            <el-form-item>
+                Insert page
+            </el-form-item>
+            <el-form-item label="filename">
+                <el-input autosize v-model="content.filename"></el-input>
+            </el-form-item>
+            <el-form-item label="intro">
+                <el-input :autosize="{ minRows: 4, maxRows: 4}" type="textarea" v-model="content.intro"></el-input>
+            </el-form-item>
+
+            <el-form-item>
+                <el-button v-on:click="insertBtn" type="primary">Save</el-button>
+            </el-form-item>
+        </el-form>
+
+        <div v-show="view">
+            <el-table :data="tableData" style="width: 800px">
+                <el-table-column prop="id" label="id">
+                </el-table-column>
+                <el-table-column prop="filename" label="filename">
+                    <template slot-scope="scope">
+                        <el-button @click="dlClick(scope.row)" type="text">{{scope.row.filename}}</el-button>
+                    </template>
+                </el-table-column>
+                <el-table-column prop="intro" label="intro">
+                </el-table-column>
+                <el-table-column label="edit">
+                    <template slot-scope="scope">
+                        <el-button @click="handleClick(scope.row)" type="text" size="small">edit</el-button>
+                    </template>
+                </el-table-column>
+            </el-table>
+        </div>
+
+        <el-form v-show="edit" label-width="80px">
+            <el-form-item label="filename">
+                <el-input autosize v-model="content.filename"></el-input>
+            </el-form-item>
+            <el-form-item label="intro">
+                <el-input :autosize="{ minRows: 4, maxRows: 4}" type="textarea" v-model="content.intro"></el-input>
+            </el-form-item>
+
+            <el-form-item>
+                <el-button v-on:click="saveBtn" type="primary">Save</el-button>
+            </el-form-item>
+        </el-form>
+    </div>
+</body>
+<script>
+    let app = new Vue({
+        el: '#app',
+        created: function () {
+            let that = this;
+            this.page = new URL(location.href).searchParams.get('page');
+            this.content.id = new URL(location.href).searchParams.get('id');
+            this.beforePage = JSON.parse(JSON.stringify(this.page));
+           // console.log(this.page)
+           // console.log(this.beforePage)
+            window.addEventListener("beforeunload", function (e) {
+               // console.log("learving", that.page, that.beforePage);
+                if (that.beforePage=="edit") {
+                    that.leaving();
+                    (e || window.event).returnValue = null;
+                    return null;
+                }
+            });
+
+            if (this.page == "init") {
+                this.init = true;
+                this.view = false;
+                this.edit = false;
+            } else if (this.page == "view") {
+                this.init = false;
+                this.view = true;
+                this.edit = false;
+                this.viewAjax().then(function (
+                    response) {
+                    that.tableData = response.list;
+                }).catch(function (err) {
+
+                });
+            } else if (this.page == "edit") {
+                this.init = false;
+                this.view = false;
+                this.edit = true;
+                this.editAjax(this.content.id).then(function (
+                    response) {
+                    if (response.errCode == "00") {
+                        that.content = response.content;
+                        if (response.content.isUse == 0) {
+                            this.timer = setInterval(this.get, 1000);
+                        } else {
+                            alert("lock");
+                            window.location.href = "/?page=view";
+                        }
+                    } else {
+                        alert("error")
+                        window.location.href = "/?page=view";
+                    }
+                }).catch(function (err) {
+                    window.location.href = "/?page=view";
+
+                });
+            }
+        },
+        mounted() {},
+        beforeDestroy() {
+            clearInterval(this.timer);
+        },
+        data: {
+            page: "init",
+            beforePage: "",
+            init: true,
+            view: false,
+            edit: false,
+            content: {
+                filename: "filename1",
+                intro: "filename1intro",
+                fileid: "",
+                id: "",
+            },
+            tableData: [],
+            timer: '',
+            value: 0
+        },
+        methods: {
+            leaving: function () {
+                console.log("Leaving...");
+                if (this.page == "edit") {
+                    this.setLockAjax();
+                }
+            },
+            get() {
+                this.value++;
+                if (this.value == 60) {
+                    clearInterval(this.timer);
+                }
+            },
+            insertpage() {
+                window.location.href = "/"
+            },
+            viewpage() {
+                window.location.href = "/?page=view"
+            },
+            dlClick(row) {
+                window.open("/upload/" + row.filename);
+            },
+            handleClick(row) {
+                window.location.href = "/?page=edit&id=" + row.id
+            },
+            saveBtn() {
+                this.saveAjax().then(function (
+                    response) {
+                    console.log(response);
+                    if (response.errCode == "00") {
+                        alert("save ok  " + response.id);
+                        window.location.href = "/?page=view"
+                    } else {
+                        alert("save fail");
+                    }
+
+                }).catch(function (err) {
+
+                });
+            },
+            insertBtn() {
+                this.insertAjax().then(function (
+                    response) {
+                    console.log(response);
+                    if (response.errCode == "00") {
+                        alert("save ok" + response.id);
+                    } else {
+                        alert("save fail");
+                    }
+
+                }).catch(function (err) {
+
+                });
+            },
+            setLockAjax() {
+                let that = this;
+                return new Promise(function (resolve, reject) {
+                    axios({
+                            method: 'get',
+                            url: '/jupiter/setLock',
+                            params: {
+                                id: that.content.id,
+                                isLock: 0
+                            }
+                        })
+                        .then(function (response) {
+                            resolve(response.data);
+                        }).catch(function (err) {
+                            reject(err);
+                        });
+                });
+
+            },
+            saveAjax() {
+                let that = this;
+                return new Promise(function (resolve, reject) {
+                    axios({
+                            method: 'POST',
+                            url: '/jupiter/save',
+                            data: that.content
+                        })
+                        .then(function (response) {
+                            resolve(response.data);
+                        }).catch(function (err) {
+                            reject(err);
+                        });
+                });
+
+            },
+            insertAjax() {
+                let that = this;
+                return new Promise(function (resolve, reject) {
+                    axios({
+                            method: 'POST',
+                            url: '/jupiter/insert',
+                            data: that.content
+                        })
+                        .then(function (response) {
+                            resolve(response.data);
+                        }).catch(function (err) {
+                            reject(err);
+                        });
+                });
+
+            },
+            viewAjax() {
+                let that = this;
+                return new Promise(function (resolve, reject) {
+                    axios({
+                            method: 'get',
+                            url: '/jupiter/view'
+                        })
+                        .then(function (response) {
+                            resolve(response.data);
+                        }).catch(function (err) {
+                            reject(err);
+                        });
+                });
+
+            },
+            editAjax(id) {
+                let that = this;
+                return new Promise(function (resolve, reject) {
+                    axios({
+                            method: 'get',
+                            url: '/jupiter/edit',
+                            params: {
+                                id: id
+                            }
+                        })
+                        .then(function (response) {
+                            resolve(response.data);
+                        }).catch(function (err) {
+                            reject(err);
+                        });
+                });
+
+            }
+
+
+        }
+    });
+</script>
+
+</html>
