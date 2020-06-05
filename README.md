@@ -19,6 +19,13 @@ $ npm start
 http://127.0.0.1:8080/
 
 
+## Examples.
+```Bash
+$ git clone https://github.com/taiwanliu/jupiter.git
+$ cd jupiter
+$ npm install
+$ npm start
+```
 
 ## Contact
 ##### Author: Mike Liu
